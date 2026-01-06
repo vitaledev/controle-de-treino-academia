@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IronLog - Project OLYMPIA</title>
+    <title>IronLog - Project OLYMPIA (Offline)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,7 +16,7 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Tailwind Config for Custom Colors/Fonts -->
+    <!-- Tailwind Config -->
     <script>
         tailwind.config = {
             theme: {
@@ -82,9 +82,7 @@
 
     <!-- Toast Notification -->
     <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 z-50 hidden text-white px-6 py-3 rounded-none skew-x-[-10deg] shadow-[0_0_20px_rgba(217,70,239,0.5)] flex items-center gap-3 animate-bounce-in border-2 border-white/20 whitespace-nowrap">
-        <div class="skew-x-[10deg] flex items-center gap-3 font-phonk uppercase tracking-wider text-sm" id="toast-content">
-            <!-- Icon and Text injected here -->
-        </div>
+        <div class="skew-x-[10deg] flex items-center gap-3 font-phonk uppercase tracking-wider text-sm" id="toast-content"></div>
     </div>
 
     <!-- Loading Screen -->
@@ -105,9 +103,7 @@
                 <p class="text-[10px] text-amber-500 font-phonk tracking-[0.3em] mt-2 uppercase border-t border-amber-900/50 pt-2 inline-block">Forje seu Legado</p>
             </div>
 
-            <nav class="flex-1 space-y-4" id="desktop-nav">
-                <!-- Nav Items injected via JS -->
-            </nav>
+            <nav class="flex-1 space-y-4" id="desktop-nav"></nav>
 
             <!-- Streak Desktop -->
             <div class="mb-6 p-4 border border-amber-500/20 bg-amber-900/10 rounded clip-path-slant flex items-center justify-between">
@@ -119,10 +115,10 @@
             </div>
 
             <div class="mt-auto border-t border-slate-800 pt-6 flex items-center gap-3">
-                <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-greek font-bold text-xl shadow-[0_0_15px_rgba(245,158,11,0.2)]" id="user-avatar">G</div>
+                <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-greek font-bold text-xl shadow-[0_0_15px_rgba(245,158,11,0.2)]">L</div>
                 <div>
-                    <p class="text-sm font-greek font-bold text-white tracking-wide">SEMIDEUS</p>
-                    <p class="text-[10px] text-slate-500 font-mono" id="user-id">ID: ...</p>
+                    <p class="text-sm font-greek font-bold text-white tracking-wide">ATLETA LOCAL</p>
+                    <p class="text-[10px] text-slate-500 font-mono">Modo Offline</p>
                 </div>
             </div>
         </div>
@@ -146,48 +142,86 @@
         </main>
 
         <!-- Mobile Bottom Nav -->
-        <div class="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-md border-t border-slate-800 lg:hidden z-50 flex justify-around p-2 pb-4" id="mobile-nav">
-            <!-- Nav Items injected JS -->
-        </div>
+        <div class="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-md border-t border-slate-800 lg:hidden z-50 flex justify-around p-2 pb-4" id="mobile-nav"></div>
 
     </div>
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, arrayUnion, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    <!-- Application Logic -->
+    <script>
+        // --- DATA STORE (LOCAL STORAGE) ---
+        const Store = {
+            getKeys: () => ({ EXERCISES: 'ironlog_exercises', WEIGHT: 'ironlog_weight' }),
+            
+            getExercises: () => {
+                const data = localStorage.getItem(Store.getKeys().EXERCISES);
+                return data ? JSON.parse(data) : [];
+            },
+            
+            saveExercises: (exercises) => {
+                localStorage.setItem(Store.getKeys().EXERCISES, JSON.stringify(exercises));
+            },
+
+            getWeightHistory: () => {
+                const data = localStorage.getItem(Store.getKeys().WEIGHT);
+                return data ? JSON.parse(data) : [];
+            },
+
+            saveWeightHistory: (history) => {
+                localStorage.setItem(Store.getKeys().WEIGHT, JSON.stringify(history));
+            },
+
+            // Operations
+            addExercise: (exercise) => {
+                const list = Store.getExercises();
+                list.push({ ...exercise, id: Date.now().toString(), createdAt: new Date().toISOString(), lastUpdated: new Date().toISOString(), history: [] });
+                Store.saveExercises(list);
+            },
+
+            updateExercise: (id, updates) => {
+                const list = Store.getExercises();
+                const index = list.findIndex(e => e.id === id);
+                if (index !== -1) {
+                    list[index] = { ...list[index], ...updates, lastUpdated: new Date().toISOString() };
+                    Store.saveExercises(list);
+                }
+            },
+
+            deleteExercise: (id) => {
+                const list = Store.getExercises().filter(e => e.id !== id);
+                Store.saveExercises(list);
+            },
+
+            addSet: (exerciseId, set) => {
+                const list = Store.getExercises();
+                const index = list.findIndex(e => e.id === exerciseId);
+                if (index !== -1) {
+                    const ex = list[index];
+                    ex.history.push({ ...set, id: Date.now().toString() });
+                    ex.maxWeight = Math.max(ex.maxWeight || 0, set.weight);
+                    ex.lastUpdated = new Date().toISOString();
+                    Store.saveExercises(list);
+                }
+            },
+
+            addWeight: (entry) => {
+                const list = Store.getWeightHistory();
+                list.unshift({ ...entry, id: Date.now().toString(), date: new Date().toISOString() });
+                Store.saveWeightHistory(list);
+            }
+        };
 
         // --- GLOBAL STATE ---
         const state = {
-            user: null,
             exercises: [],
             weightHistory: [],
-            view: 'list', // list, detail, new, plans, tips, weight
+            view: 'list',
             selectedExercise: null,
             loading: true,
             importing: false,
-            // Calendar state
             currentMonth: new Date().getMonth(),
             currentYear: new Date().getFullYear(),
-            // Edit state
             isEditing: false
         };
-
-        // --- FIREBASE CONFIG (Use global vars from environment) ---
-        // Note: For local development, replace this with your actual config object
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-        // --- INITIALIZE FIREBASE ---
-        let app, auth, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) {
-            console.error("Firebase Init Error:", e);
-        }
 
         // --- DATA CONSTANTS ---
         const MUSCLES = ['Peito', 'Costas', 'Pernas', 'Ombros', 'Bíceps', 'Tríceps', 'Abs', 'Cardio'];
@@ -204,68 +238,30 @@
             { category: 'Néctar (Nutrição)', icon: 'utensils', items: [{title: 'Proteína é Rei', content: '1.6g a 2g por kg de peso.'}, {title: 'Hidratação', content: '3-4 litros de água por dia.'}, {title: 'Carboidratos', content: 'Combustível para treinos intensos.'}] }
         ];
 
-        // --- AUTH & LISTENERS ---
-        async function initAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Auth Error", error);
-            }
-        }
-
-        initAuth();
-
-        onAuthStateChanged(auth, (user) => {
-            state.user = user;
-            if (user) {
-                setupListeners(user.uid);
-                updateUserProfile(user);
-            } else {
+        // --- INITIALIZATION ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            setTimeout(() => {
                 state.loading = false;
                 render();
-            }
+            }, 800); // Fake load for vibe
         });
 
-        function setupListeners(uid) {
-            // Exercises Listener
-            const exRef = collection(db, 'artifacts', appId, 'users', uid, 'exercises');
-            onSnapshot(exRef, (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Sort by last updated
-                data.sort((a, b) => (b.lastUpdated?.seconds || 0) - (a.lastUpdated?.seconds || 0));
-                state.exercises = data;
-                
-                // If currently viewing details, update selectedExercise
-                if (state.selectedExercise) {
-                    const updated = data.find(e => e.id === state.selectedExercise.id);
-                    if (updated) state.selectedExercise = updated;
-                    else if (state.view === 'detail') state.view = 'list'; // Deleted externally
-                }
+        function loadData() {
+            const rawExercises = Store.getExercises();
+            // Sort by lastUpdated desc
+            state.exercises = rawExercises.sort((a, b) => new Date(b.lastUpdated || 0) - new Date(a.lastUpdated || 0));
+            state.weightHistory = Store.getWeightHistory();
 
-                state.loading = false;
-                render();
-            });
-
-            // Weight Listener
-            const wRef = query(collection(db, 'artifacts', appId, 'users', uid, 'weight_history'), orderBy('date', 'desc'));
-            onSnapshot(wRef, (snapshot) => {
-                state.weightHistory = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                render();
-            });
+            // Refresh selected exercise if open
+            if (state.selectedExercise) {
+                const refreshed = state.exercises.find(e => e.id === state.selectedExercise.id);
+                if (refreshed) state.selectedExercise = refreshed;
+                else if (state.view === 'detail') state.view = 'list';
+            }
         }
 
-        function updateUserProfile(user) {
-            document.getElementById('user-avatar').innerText = user.uid.charAt(0).toUpperCase();
-            document.getElementById('user-id').innerText = `ID: ${user.uid.slice(0,4)}`;
-        }
-
-        // --- LOGIC FUNCTIONS ---
-
-        // Helpers
+        // --- HELPERS ---
         function checkStreak(exercises) {
             const dates = new Set();
             exercises.forEach(ex => {
@@ -304,34 +300,30 @@
             return {val: imc.toFixed(1), status: s, color: c};
         }
 
-        // Actions
-        window.createExercise = async (e) => {
+        // --- ACTIONS ---
+        window.createExercise = (e) => {
             e.preventDefault();
             const name = document.getElementById('new-ex-name').value;
             const muscle = window.newExerciseMuscle || 'Peito';
             if(!name.trim()) return;
             
-            await addDoc(collection(db, 'artifacts', appId, 'users', state.user.uid, 'exercises'), {
-                name, muscle, history: [], createdAt: serverTimestamp(), lastUpdated: serverTimestamp(), maxWeight: 0
-            });
+            Store.addExercise({ name, muscle, maxWeight: 0 });
+            loadData();
             showToast('LEGADO INICIADO', 'success');
             renderView('list');
         };
 
-        window.addSet = async (e) => {
+        window.addSet = (e) => {
             e.preventDefault();
             const w = parseFloat(document.getElementById('set-weight').value);
             const r = parseInt(document.getElementById('set-reps').value);
             if(!w || !r) return;
 
-            const newMax = Math.max(state.selectedExercise.maxWeight || 0, w);
             const isPR = w > (state.selectedExercise.maxWeight || 0);
-
-            await updateDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'exercises', state.selectedExercise.id), {
-                history: arrayUnion({ date: new Date().toISOString(), weight: w, reps: r, id: Date.now().toString() }),
-                lastUpdated: serverTimestamp(),
-                maxWeight: newMax
-            });
+            Store.addSet(state.selectedExercise.id, { weight: w, reps: r, date: new Date().toISOString() });
+            
+            loadData();
+            render(); // Re-render detail view
 
             document.getElementById('set-weight').value = '';
             document.getElementById('set-reps').value = '';
@@ -340,67 +332,63 @@
             else showToast('SACRIFÍCIO ACEITO');
         };
 
-        window.deleteExercise = async () => {
+        window.deleteExercise = () => {
             if(!confirm("Deseja apagar este legado?")) return;
-            await deleteDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'exercises', state.selectedExercise.id));
+            Store.deleteExercise(state.selectedExercise.id);
+            loadData();
             showToast('LEGADO APAGADO');
             renderView('list');
         };
 
-        window.updateExercise = async () => {
+        window.updateExercise = () => {
             const name = document.getElementById('edit-name').value;
             const muscle = window.editMuscleVal;
             if(!name.trim()) return;
             
-            await updateDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'exercises', state.selectedExercise.id), {
-                name, muscle, lastUpdated: serverTimestamp()
-            });
+            Store.updateExercise(state.selectedExercise.id, { name, muscle });
             state.isEditing = false;
+            loadData();
             showToast('LEGADO ATUALIZADO');
-            // Optimistic update
-            state.selectedExercise.name = name;
-            state.selectedExercise.muscle = muscle;
             render();
         };
 
-        window.saveWeight = async (e) => {
+        window.saveWeight = (e) => {
             e.preventDefault();
             const w = parseFloat(document.getElementById('weight-input').value);
             const h = parseFloat(document.getElementById('height-input').value);
             if(!w) return;
             
-            await addDoc(collection(db, 'artifacts', appId, 'users', state.user.uid, 'weight_history'), {
-                weight: w, height: h || null, date: new Date().toISOString()
-            });
+            Store.addWeight({ weight: w, height: h || null });
             document.getElementById('weight-input').value = '';
+            loadData();
             showToast('PESO REGISTRADO');
+            render();
         };
 
-        window.importPlan = async (planId) => {
+        window.importPlan = (planId) => {
             if(state.importing) return;
             state.importing = true;
-            render(); // update UI to show loading on button
+            render(); // UI Loading state
             
-            const plan = TRAINING_PLANS.find(p => p.id === planId);
-            const promises = plan.exercises.map(async (ex) => {
-                // Check dupes
-                const q = query(collection(db, 'artifacts', appId, 'users', state.user.uid, 'exercises'), where("name", "==", ex.name));
-                const snap = await getDocs(q);
-                if(snap.empty) {
-                    await addDoc(collection(db, 'artifacts', appId, 'users', state.user.uid, 'exercises'), {
-                        name: ex.name, muscle: ex.muscle, history: [], createdAt: serverTimestamp(), lastUpdated: serverTimestamp(), maxWeight: 0
-                    });
-                }
-            });
-            
-            await Promise.all(promises);
-            state.importing = false;
-            triggerConfetti();
-            showToast(`CAMINHO ${plan.title.split(' ')[0].toUpperCase()} ADOTADO`);
-            renderView('list');
+            setTimeout(() => { // Simulate async for UI feel
+                const plan = TRAINING_PLANS.find(p => p.id === planId);
+                const currentExNames = state.exercises.map(e => e.name);
+                
+                plan.exercises.forEach(ex => {
+                    if(!currentExNames.includes(ex.name)) {
+                        Store.addExercise({ name: ex.name, muscle: ex.muscle, maxWeight: 0 });
+                    }
+                });
+                
+                state.importing = false;
+                loadData();
+                triggerConfetti();
+                showToast(`CAMINHO ${plan.title.split(' ')[0].toUpperCase()} ADOTADO`);
+                renderView('list');
+            }, 500);
         };
 
-        // UI Actions
+        // --- UI NAVIGATION ---
         window.renderView = (viewName, exercise = null) => {
             state.view = viewName;
             if(exercise) {
@@ -413,7 +401,11 @@
 
         window.setEditMuscle = (m) => { window.editMuscleVal = m; render(); };
         window.setNewMuscle = (m) => { window.newExerciseMuscle = m; render(); };
-        window.toggleEdit = () => { state.isEditing = !state.isEditing; if(state.isEditing){ window.editMuscleVal = state.selectedExercise.muscle; } render(); };
+        window.toggleEdit = () => { 
+            state.isEditing = !state.isEditing; 
+            if(state.isEditing){ window.editMuscleVal = state.selectedExercise.muscle; } 
+            render(); 
+        };
         window.changeMonth = (delta) => {
             let m = state.currentMonth + delta;
             let y = state.currentYear;
@@ -423,7 +415,7 @@
             render();
         };
 
-        // Visual Effects
+        // --- VISUAL EFFECTS ---
         function showToast(msg, type='success') {
             const el = document.getElementById('toast');
             const content = document.getElementById('toast-content');
@@ -455,12 +447,11 @@
             }
         }
 
-        // --- RENDER ENGINE ---
-
+        // --- RENDER FUNCTIONS ---
         function render() {
-            // Handle Loading
             const loader = document.getElementById('loading-screen');
             const content = document.getElementById('app-content');
+            
             if (state.loading) {
                 loader.classList.remove('hidden');
                 content.classList.add('hidden');
@@ -477,10 +468,8 @@
             const flames = document.querySelectorAll('.text-amber-500[data-lucide="flame"]');
             flames.forEach(f => f.classList.toggle('animate-pulse', streak > 0));
 
-            // Render Navs
             renderNavs();
 
-            // Render Main View
             const main = document.getElementById('main-view');
             main.innerHTML = '';
             
@@ -491,7 +480,6 @@
             else if(state.view === 'weight') renderWeight(main);
             else if(state.view === 'detail') renderDetail(main);
 
-            // Re-init Icons
             lucide.createIcons();
         }
 
@@ -503,7 +491,6 @@
                 {id: 'weight', label: 'Peso', icon: 'scale', color: 'text-emerald-500', bg: 'bg-emerald-900/20 border-emerald-500'}
             ];
 
-            // Desktop
             const dNav = document.getElementById('desktop-nav');
             dNav.innerHTML = navItems.map(item => `
                 <button onclick="renderView('${item.id}')" class="w-full flex items-center gap-4 px-4 py-3 text-lg font-phonk tracking-wider transition-all clip-path-slant group ${state.view === item.id ? `${item.bg} ${item.color} border-l-2` : 'text-slate-500 hover:text-white hover:bg-white/5'}">
@@ -513,7 +500,6 @@
                 ${item.id === 'plans' ? `<button onclick="renderView('new')" class="w-full flex items-center gap-4 px-4 py-3 text-lg font-phonk tracking-wider transition-all group ${state.view === 'new' ? 'bg-fuchsia-900/20 text-fuchsia-400 border-l-2 border-fuchsia-500' : 'text-slate-500 hover:text-white hover:bg-white/5'}"><i data-lucide="plus" class="${state.view === 'new' ? 'text-fuchsia-500' : 'group-hover:text-white'}"></i> NOVO DESAFIO</button>` : ''}
             `).join('');
 
-            // Mobile
             const mNav = document.getElementById('mobile-nav');
             mNav.innerHTML = `
                 ${navItems.slice(0, 2).map(item => `<button onclick="renderView('${item.id}')" class="flex flex-col items-center p-2 rounded-lg transition-colors ${state.view === item.id ? item.color : 'text-slate-500'}"><i data-lucide="${item.icon}"></i><span class="text-[10px] font-phonk uppercase mt-1">${item.label}</span></button>`).join('')}
@@ -521,8 +507,6 @@
                 ${navItems.slice(2).map(item => `<button onclick="renderView('${item.id}')" class="flex flex-col items-center p-2 rounded-lg transition-colors ${state.view === item.id ? item.color : 'text-slate-500'}"><i data-lucide="${item.icon}"></i><span class="text-[10px] font-phonk uppercase mt-1">${item.label}</span></button>`).join('')}
             `;
         }
-
-        // --- VIEW RENDERERS ---
 
         function renderList(container) {
             container.innerHTML = `
@@ -825,7 +809,7 @@
             `;
         }
 
-        // Calendar HTML Helper
+        // Calendar Helper
         function getCalendarHTML() {
             const daysInMonth = new Date(state.currentYear, state.currentMonth + 1, 0).getDate();
             const firstDay = new Date(state.currentYear, state.currentMonth, 1).getDay();
