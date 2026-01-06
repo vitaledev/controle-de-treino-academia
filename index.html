@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IronLog - Project OLYMPIA</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Teko:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Tailwind Config for Custom Colors/Fonts -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        greek: ['Cinzel', 'serif'],
+                        phonk: ['Teko', 'sans-serif'],
+                    },
+                    colors: {
+                        fuchsia: { 400: '#e879f9', 500: '#d946ef', 600: '#c026d3', 900: '#701a75' },
+                        amber: { 400: '#fbbf24', 500: '#f59e0b', 900: '#78350f' },
+                        cyan: { 400: '#22d3ee', 500: '#06b6d4', 900: '#164e63' },
+                        emerald: { 400: '#34d399', 500: '#10b981', 900: '#064e3b' },
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Styles & Effects */
+        body { background-color: #050505; color: #e2e8f0; }
+        .bg-noise { background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"); }
+        .text-glow { text-shadow: 0 0 10px rgba(217, 70, 239, 0.5); }
+        .text-glow-gold { text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+        .clip-path-slant { clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+        .clip-path-badge { clip-path: polygon(10% 0, 100% 0, 100% 100%, 0 100%, 0 0); }
+        
+        /* Toast Animation */
+        @keyframes bounceIn {
+            0% { opacity: 0; transform: translate(-50%, -20px) scale(0.8); }
+            100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+        }
+        .animate-bounce-in { animation: bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+        
+        /* Fade In */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+
+        /* Confetti */
+        .confetti { position: absolute; width: 8px; height: 8px; animation: fall linear forwards; }
+        @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
+    </style>
+</head>
+<body class="selection:bg-fuchsia-500 selection:text-white overflow-x-hidden">
+
+    <!-- Background Elements -->
+    <div class="fixed inset-0 z-0 pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-fuchsia-900/20 blur-[120px] rounded-full mix-blend-screen"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-900/10 blur-[120px] rounded-full mix-blend-screen"></div>
+        <div class="absolute inset-0 bg-noise opacity-30 mix-blend-overlay"></div>
+        <div class="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+    </div>
+
+    <!-- Container for Confetti -->
+    <div id="confetti-container" class="fixed inset-0 pointer-events-none z-50 overflow-hidden"></div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 z-50 hidden text-white px-6 py-3 rounded-none skew-x-[-10deg] shadow-[0_0_20px_rgba(217,70,239,0.5)] flex items-center gap-3 animate-bounce-in border-2 border-white/20 whitespace-nowrap">
+        <div class="skew-x-[10deg] flex items-center gap-3 font-phonk uppercase tracking-wider text-sm" id="toast-content">
+            <!-- Icon and Text injected here -->
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="fixed inset-0 bg-black z-[100] flex items-center justify-center text-fuchsia-500 flex-col gap-4">
+        <i data-lucide="activity" class="animate-spin w-12 h-12"></i>
+        <span class="font-greek tracking-widest text-sm animate-pulse">CARREGANDO OLIMPO...</span>
+    </div>
+
+    <!-- App Layout -->
+    <div id="app-content" class="relative z-10 flex flex-col lg:flex-row min-h-screen hidden">
+        
+        <!-- Desktop Sidebar -->
+        <div class="hidden lg:flex flex-col w-72 border-r border-slate-800 bg-black/50 backdrop-blur-xl p-8 sticky top-0 h-screen">
+            <div class="mb-10">
+                <h1 class="text-4xl font-greek font-black text-white flex flex-col leading-none tracking-tighter cursor-pointer" onclick="renderView('list')">
+                    <span>OLYMPIA</span><span class="text-fuchsia-500 text-glow text-5xl">LOG</span>
+                </h1>
+                <p class="text-[10px] text-amber-500 font-phonk tracking-[0.3em] mt-2 uppercase border-t border-amber-900/50 pt-2 inline-block">Forje seu Legado</p>
+            </div>
+
+            <nav class="flex-1 space-y-4" id="desktop-nav">
+                <!-- Nav Items injected via JS -->
+            </nav>
+
+            <!-- Streak Desktop -->
+            <div class="mb-6 p-4 border border-amber-500/20 bg-amber-900/10 rounded clip-path-slant flex items-center justify-between">
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-amber-500 font-phonk uppercase tracking-widest">Ofensiva</span>
+                    <span class="text-2xl text-white font-greek font-bold leading-none" id="desktop-streak-value">0 Dias</span>
+                </div>
+                <i data-lucide="flame" class="w-8 h-8 text-amber-500"></i>
+            </div>
+
+            <div class="mt-auto border-t border-slate-800 pt-6 flex items-center gap-3">
+                <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-greek font-bold text-xl shadow-[0_0_15px_rgba(245,158,11,0.2)]" id="user-avatar">G</div>
+                <div>
+                    <p class="text-sm font-greek font-bold text-white tracking-wide">SEMIDEUS</p>
+                    <p class="text-[10px] text-slate-500 font-mono" id="user-id">ID: ...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Header -->
+        <header class="lg:hidden bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-800 p-4 flex justify-between items-center">
+            <div onclick="renderView('list')" class="cursor-pointer">
+                <h1 class="text-2xl font-greek font-black text-white leading-none">OLYMPIA <span class="text-fuchsia-500 text-glow">LOG</span></h1>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1 bg-amber-900/20 px-2 py-1 border border-amber-500/20 rounded">
+                    <i data-lucide="flame" class="w-3 h-3 text-amber-500"></i>
+                    <span class="text-sm font-bold text-amber-500 font-phonk" id="mobile-streak-value">0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="main-view" class="flex-1 p-4 lg:p-10 max-w-7xl mx-auto w-full pb-24 lg:pb-0">
+            <!-- Dynamic Content Injected Here -->
+        </main>
+
+        <!-- Mobile Bottom Nav -->
+        <div class="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-md border-t border-slate-800 lg:hidden z-50 flex justify-around p-2 pb-4" id="mobile-nav">
+            <!-- Nav Items injected JS -->
+        </div>
+
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, arrayUnion, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // --- GLOBAL STATE ---
+        const state = {
+            user: null,
+            exercises: [],
+            weightHistory: [],
+            view: 'list', // list, detail, new, plans, tips, weight
+            selectedExercise: null,
+            loading: true,
+            importing: false,
+            // Calendar state
+            currentMonth: new Date().getMonth(),
+            currentYear: new Date().getFullYear(),
+            // Edit state
+            isEditing: false
+        };
+
+        // --- FIREBASE CONFIG (Use global vars from environment) ---
+        // Note: For local development, replace this with your actual config object
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // --- INITIALIZE FIREBASE ---
+        let app, auth, db;
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
+        }
+
+        // --- DATA CONSTANTS ---
+        const MUSCLES = ['Peito', 'Costas', 'Pernas', 'Ombros', 'Bíceps', 'Tríceps', 'Abs', 'Cardio'];
+        
+        const TRAINING_PLANS = [
+            { id: 'abc_hercules', title: 'Hércules (ABC)', subtitle: 'Hipertrofia Clássica', target: 'Masculino / Geral', description: 'Divisão Push/Pull/Legs forjada pelos deuses.', tips: ['Cargas progressivas.', 'Descanse 2 min nos compostos.'], exercises: [{name:'Supino Reto',muscle:'Peito'},{name:'Desenvolvimento Militar',muscle:'Ombros'},{name:'Tríceps Testa',muscle:'Tríceps'},{name:'Puxada Alta',muscle:'Costas'},{name:'Rosca Direta',muscle:'Bíceps'},{name:'Agachamento Livre',muscle:'Pernas'},{name:'Leg Press 45',muscle:'Pernas'}] },
+            { id: 'abc_atena', title: 'Atena (ABC)', subtitle: 'Foco Inferiores & Glúteo', target: 'Feminino / Foco Glúteo', description: 'Estratégia para maximizar volume em inferiores.', tips: ['Contraia o glúteo.', 'Cadência controlada.'], exercises: [{name:'Agachamento Livre',muscle:'Pernas'},{name:'Elevação Pélvica',muscle:'Pernas'},{name:'Cadeira Extensora',muscle:'Pernas'},{name:'Puxada Frente',muscle:'Costas'},{name:'Desenvolvimento Halteres',muscle:'Ombros'},{name:'Stiff',muscle:'Pernas'},{name:'Mesa Flexora',muscle:'Pernas'},{name:'Cadeira Abdutora',muscle:'Pernas'}] },
+            { id: 'ab_sparta', title: 'Sparta (AB)', subtitle: 'Upper / Lower', target: 'Masculino / Força', description: 'Treino brutal dividido em Tronco e Membros Inferiores.', tips: ['Foco em compostos.', 'Alta intensidade.'], exercises: [{name:'Supino Reto',muscle:'Peito'},{name:'Remada Curvada',muscle:'Costas'},{name:'Desenvolvimento',muscle:'Ombros'},{name:'Barra Fixa',muscle:'Costas'},{name:'Agachamento',muscle:'Pernas'},{name:'Levantamento Terra',muscle:'Pernas'},{name:'Panturrilha em Pé',muscle:'Pernas'}] },
+            { id: 'ab_amazonas', title: 'Amazonas (AB)', subtitle: 'Inferiores / Superiores', target: 'Feminino / Geral', description: 'Divisão equilibrada para corpo atlético.', tips: ['Amplitude máxima.', 'Conexão mente-músculo.'], exercises: [{name:'Agachamento Búlgaro',muscle:'Pernas'},{name:'Elevação Pélvica',muscle:'Pernas'},{name:'Supino Inclinado Halter',muscle:'Peito'},{name:'Remada Baixa',muscle:'Costas'},{name:'Elevação Lateral',muscle:'Ombros'},{name:'Abdominal Infra',muscle:'Abs'}] }
+        ];
+
+        const TIPS_DATA = [
+            { category: 'Arte da Guerra (Treino)', icon: 'swords', items: [{title: 'Sobrecarga Progressiva', content: 'Aumente carga ou repetições sempre.'}, {title: 'Conexão Mente-Músculo', content: 'Sinta o músculo contrair.'}, {title: 'Descanso Estratégico', content: 'Cresça enquanto dorme.'}] },
+            { category: 'Néctar (Nutrição)', icon: 'utensils', items: [{title: 'Proteína é Rei', content: '1.6g a 2g por kg de peso.'}, {title: 'Hidratação', content: '3-4 litros de água por dia.'}, {title: 'Carboidratos', content: 'Combustível para treinos intensos.'}] }
+        ];
+
+        // --- AUTH & LISTENERS ---
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth Error", error);
+            }
+        }
+
+        initAuth();
+
+        onAuthStateChanged(auth, (user) => {
+            state.user = user;
+            if (user) {
+                setupListeners(user.uid);
+                updateUserProfile(user);
+            } else {
+                state.loading = false;
+                render();
+            }
+        });
+
+        function setupListeners(uid) {
+            // Exercises Listener
+            const exRef = collection(db, 'artifacts', appId, 'users', uid, 'exercises');
+            onSnapshot(exRef, (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Sort by last updated
+                data.sort((a, b) => (b.lastUpdated?.seconds || 0) - (a.lastUpdated?.seconds || 0));
+                state.exercises = data;
+                
+                // If currently viewing details, update selectedExercise
+                if (state.selectedExercise) {
+                    const updated = data.find(e => e.id === state.selectedExercise.id);
+                    if (updated) state.selectedExercise = updated;
+                    else if (state.view === 'detail') state.view = 'list'; // Deleted externally
+                }
+
+                state.loading = false;
+                render();
+            });
+
+            // Weight Listener
+            const wRef = query(collection(db, 'artifacts', appId, 'users', uid, 'weight_history'), orderBy('date', 'desc'));
+            onSnapshot(wRef, (snapshot) => {
+                state.weightHistory = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                render();
+            });
+        }
+
+        function updateUserProfile(user) {
+            document.getElementById('user-avatar').innerText = user.uid.charAt(0).toUpperCase();
+            document.getElementById('user-id').innerText = `ID: ${user.uid.slice(0,4)}`;
+        }
+
+        // --- LOGIC FUNCTIONS ---
+
+        // Helpers
+        function checkStreak(exercises) {
+            const dates = new Set();
+            exercises.forEach(ex => {
+                if(ex.history) ex.history.forEach(h => dates.add(new Date(h.date).toDateString()));
+            });
+            const sorted = Array.from(dates).map(d => new Date(d)).sort((a,b) => b-a);
+            if(sorted.length === 0) return 0;
+            
+            const today = new Date(); today.setHours(0,0,0,0);
+            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1);
+            const last = new Date(sorted[0]); last.setHours(0,0,0,0);
+            
+            if(last.getTime() !== today.getTime() && last.getTime() !== yesterday.getTime()) return 0;
+            
+            let streak = 1;
+            let current = last;
+            for(let i=1; i<sorted.length; i++){
+                const prev = new Date(sorted[i]); prev.setHours(0,0,0,0);
+                const expected = new Date(current); expected.setDate(expected.getDate()-1);
+                if(prev.getTime() === expected.getTime()){ streak++; current = prev; }
+                else if(prev.getTime() === current.getTime()) continue;
+                else break;
+            }
+            return streak;
+        }
+
+        function calculateIMC(weight, height) {
+            if(!weight || !height) return {val: 0, status: '-', color: 'slate'};
+            const h = height/100;
+            const imc = weight/(h*h);
+            let s = '', c = '';
+            if(imc < 18.5) { s='Abaixo'; c='text-blue-400 border-blue-500/30 bg-blue-900/20'; }
+            else if(imc < 24.9) { s='Ideal (Deus)'; c='text-emerald-400 border-emerald-500/30 bg-emerald-900/20'; }
+            else if(imc < 29.9) { s='Sobrepeso'; c='text-orange-400 border-orange-500/30 bg-orange-900/20'; }
+            else { s='Obesidade'; c='text-red-400 border-red-500/30 bg-red-900/20'; }
+            return {val: imc.toFixed(1), status: s, color: c};
+        }
+
+        // Actions
+        window.createExercise = async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('new-ex-name').value;
+            const muscle = window.newExerciseMuscle || 'Peito';
+            if(!name.trim()) return;
+            
+            await addDoc(collection(db, 'artifacts', appId, 'users', state.user.uid, 'exercises'), {
+                name, muscle, history: [], createdAt: serverTimestamp(), lastUpdated: serverTimestamp(), maxWeight: 0
+            });
+            showToast('LEGADO INICIADO', 'success');
+            renderView('list');
+        };
+
+        window.addSet = async (e) => {
+            e.preventDefault();
+            const w = parseFloat(document.getElementById('set-weight').value);
+            const r = parseInt(document.getElementById('set-reps').value);
+            if(!w || !r) return;
+
+            const newMax = Math.max(state.selectedExercise.maxWeight || 0, w);
+            const isPR = w > (state.selectedExercise.maxWeight || 0);
+
+            await updateDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'exercises', state.selectedExercise.id), {
+                history: arrayUnion({ date: new Date().toISOString(), weight: w, reps: r, id: Date.now().toString() }),
+                lastUpdated: serverTimestamp(),
+                maxWeight: newMax
+            });
+
+            document.getElementById('set-weight').value = '';
+            document.getElementById('set-reps').value = '';
+            
+            if(isPR) { triggerConfetti(); showToast(`NOVA LENDA: ${w}KG!`, 'pr'); }
+            else showToast('SACRIFÍCIO ACEITO');
+        };
+
+        window.deleteExercise = async () => {
+            if(!confirm("Deseja apagar este legado?")) return;
+            await deleteDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'exercises', state.selectedExercise.id));
+            showToast('LEGADO APAGADO');
+            renderView('list');
+        };
+
+        window.updateExercise = async () => {
+            const name = document.getElementById('edit-name').value;
+            const muscle = window.editMuscleVal;
+            if(!name.trim()) return;
+            
+            await updateDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'exercises', state.selectedExercise.id), {
+                name, muscle, lastUpdated: serverTimestamp()
+            });
+            state.isEditing = false;
+            showToast('LEGADO ATUALIZADO');
+            // Optimistic update
+            state.selectedExercise.name = name;
+            state.selectedExercise.muscle = muscle;
+            render();
+        };
+
+        window.saveWeight = async (e) => {
+            e.preventDefault();
+            const w = parseFloat(document.getElementById('weight-input').value);
+            const h = parseFloat(document.getElementById('height-input').value);
+            if(!w) return;
+            
+            await addDoc(collection(db, 'artifacts', appId, 'users', state.user.uid, 'weight_history'), {
+                weight: w, height: h || null, date: new Date().toISOString()
+            });
+            document.getElementById('weight-input').value = '';
+            showToast('PESO REGISTRADO');
+        };
+
+        window.importPlan = async (planId) => {
+            if(state.importing) return;
+            state.importing = true;
+            render(); // update UI to show loading on button
+            
+            const plan = TRAINING_PLANS.find(p => p.id === planId);
+            const promises = plan.exercises.map(async (ex) => {
+                // Check dupes
+                const q = query(collection(db, 'artifacts', appId, 'users', state.user.uid, 'exercises'), where("name", "==", ex.name));
+                const snap = await getDocs(q);
+                if(snap.empty) {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', state.user.uid, 'exercises'), {
+                        name: ex.name, muscle: ex.muscle, history: [], createdAt: serverTimestamp(), lastUpdated: serverTimestamp(), maxWeight: 0
+                    });
+                }
+            });
+            
+            await Promise.all(promises);
+            state.importing = false;
+            triggerConfetti();
+            showToast(`CAMINHO ${plan.title.split(' ')[0].toUpperCase()} ADOTADO`);
+            renderView('list');
+        };
+
+        // UI Actions
+        window.renderView = (viewName, exercise = null) => {
+            state.view = viewName;
+            if(exercise) {
+                state.selectedExercise = exercise;
+                state.isEditing = false;
+            }
+            if(viewName === 'new') window.newExerciseMuscle = 'Peito';
+            render();
+        };
+
+        window.setEditMuscle = (m) => { window.editMuscleVal = m; render(); };
+        window.setNewMuscle = (m) => { window.newExerciseMuscle = m; render(); };
+        window.toggleEdit = () => { state.isEditing = !state.isEditing; if(state.isEditing){ window.editMuscleVal = state.selectedExercise.muscle; } render(); };
+        window.changeMonth = (delta) => {
+            let m = state.currentMonth + delta;
+            let y = state.currentYear;
+            if(m > 11) { m = 0; y++; }
+            else if(m < 0) { m = 11; y--; }
+            state.currentMonth = m; state.currentYear = y;
+            render();
+        };
+
+        // Visual Effects
+        function showToast(msg, type='success') {
+            const el = document.getElementById('toast');
+            const content = document.getElementById('toast-content');
+            const icon = type === 'success' ? 'zap' : 'crown';
+            const color = type === 'success' ? 'text-yellow-300' : 'text-white';
+            const bg = type === 'success' ? 'bg-fuchsia-600' : 'bg-amber-500';
+            
+            el.className = `fixed top-6 left-1/2 -translate-x-1/2 z-50 text-white px-6 py-3 rounded-none skew-x-[-10deg] shadow-[0_0_20px_rgba(217,70,239,0.5)] flex items-center gap-3 animate-bounce-in border-2 border-white/20 whitespace-nowrap ${bg}`;
+            content.innerHTML = `<i data-lucide="${icon}" class="${color} fill-current w-5 h-5"></i> ${msg}`;
+            
+            el.classList.remove('hidden');
+            lucide.createIcons();
+            setTimeout(() => el.classList.add('hidden'), 3000);
+        }
+
+        function triggerConfetti() {
+            const container = document.getElementById('confetti-container');
+            const colors = ['#fbbf24', '#d946ef', '#22d3ee', '#ffffff'];
+            for(let i=0; i<50; i++) {
+                const el = document.createElement('div');
+                el.classList.add('confetti');
+                el.style.left = Math.random() * 100 + '%';
+                el.style.top = '-10px';
+                el.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                el.style.animationDuration = (Math.random() * 2 + 1) + 's';
+                el.style.animationDelay = (Math.random() * 0.5) + 's';
+                container.appendChild(el);
+                setTimeout(() => el.remove(), 3000);
+            }
+        }
+
+        // --- RENDER ENGINE ---
+
+        function render() {
+            // Handle Loading
+            const loader = document.getElementById('loading-screen');
+            const content = document.getElementById('app-content');
+            if (state.loading) {
+                loader.classList.remove('hidden');
+                content.classList.add('hidden');
+                return;
+            } else {
+                loader.classList.add('hidden');
+                content.classList.remove('hidden');
+            }
+
+            // Update Streak
+            const streak = checkStreak(state.exercises);
+            document.getElementById('desktop-streak-value').innerText = `${streak} Dias`;
+            document.getElementById('mobile-streak-value').innerText = streak;
+            const flames = document.querySelectorAll('.text-amber-500[data-lucide="flame"]');
+            flames.forEach(f => f.classList.toggle('animate-pulse', streak > 0));
+
+            // Render Navs
+            renderNavs();
+
+            // Render Main View
+            const main = document.getElementById('main-view');
+            main.innerHTML = '';
+            
+            if(state.view === 'list') renderList(main);
+            else if(state.view === 'plans') renderPlans(main);
+            else if(state.view === 'new') renderNew(main);
+            else if(state.view === 'tips') renderTips(main);
+            else if(state.view === 'weight') renderWeight(main);
+            else if(state.view === 'detail') renderDetail(main);
+
+            // Re-init Icons
+            lucide.createIcons();
+        }
+
+        function renderNavs() {
+            const navItems = [
+                {id: 'list', label: 'Arena', icon: 'layout-grid', color: 'text-fuchsia-500', bg: 'bg-fuchsia-900/20 border-fuchsia-500'},
+                {id: 'plans', label: 'Planos', icon: 'scroll-text', color: 'text-amber-500', bg: 'bg-amber-900/20 border-amber-500'},
+                {id: 'tips', label: 'Oráculo', icon: 'lightbulb', color: 'text-cyan-500', bg: 'bg-cyan-900/20 border-cyan-500'},
+                {id: 'weight', label: 'Peso', icon: 'scale', color: 'text-emerald-500', bg: 'bg-emerald-900/20 border-emerald-500'}
+            ];
+
+            // Desktop
+            const dNav = document.getElementById('desktop-nav');
+            dNav.innerHTML = navItems.map(item => `
+                <button onclick="renderView('${item.id}')" class="w-full flex items-center gap-4 px-4 py-3 text-lg font-phonk tracking-wider transition-all clip-path-slant group ${state.view === item.id ? `${item.bg} ${item.color} border-l-2` : 'text-slate-500 hover:text-white hover:bg-white/5'}">
+                    <i data-lucide="${item.icon}" class="${state.view === item.id ? item.color : 'group-hover:text-white'}"></i> 
+                    ${item.label.toUpperCase()}
+                </button>
+                ${item.id === 'plans' ? `<button onclick="renderView('new')" class="w-full flex items-center gap-4 px-4 py-3 text-lg font-phonk tracking-wider transition-all group ${state.view === 'new' ? 'bg-fuchsia-900/20 text-fuchsia-400 border-l-2 border-fuchsia-500' : 'text-slate-500 hover:text-white hover:bg-white/5'}"><i data-lucide="plus" class="${state.view === 'new' ? 'text-fuchsia-500' : 'group-hover:text-white'}"></i> NOVO DESAFIO</button>` : ''}
+            `).join('');
+
+            // Mobile
+            const mNav = document.getElementById('mobile-nav');
+            mNav.innerHTML = `
+                ${navItems.slice(0, 2).map(item => `<button onclick="renderView('${item.id}')" class="flex flex-col items-center p-2 rounded-lg transition-colors ${state.view === item.id ? item.color : 'text-slate-500'}"><i data-lucide="${item.icon}"></i><span class="text-[10px] font-phonk uppercase mt-1">${item.label}</span></button>`).join('')}
+                <div class="-mt-8"><button onclick="renderView('new')" class="w-14 h-14 bg-fuchsia-600 rounded-full flex items-center justify-center shadow-lg shadow-fuchsia-500/30 border-4 border-black text-white active:scale-95 transition-transform"><i data-lucide="plus"></i></button></div>
+                ${navItems.slice(2).map(item => `<button onclick="renderView('${item.id}')" class="flex flex-col items-center p-2 rounded-lg transition-colors ${state.view === item.id ? item.color : 'text-slate-500'}"><i data-lucide="${item.icon}"></i><span class="text-[10px] font-phonk uppercase mt-1">${item.label}</span></button>`).join('')}
+            `;
+        }
+
+        // --- VIEW RENDERERS ---
+
+        function renderList(container) {
+            container.innerHTML = `
+                <div class="animate-fade-in space-y-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-1">${getCalendarHTML()}</div>
+                        <div class="lg:col-span-2 flex flex-col justify-end border-b border-slate-800 pb-6">
+                            <h2 class="text-4xl lg:text-5xl font-greek font-bold text-white uppercase mb-1">Sua Arena</h2>
+                            <p class="text-slate-500 font-phonk tracking-widest text-sm lg:text-base">Mantenha a chama acesa. A constância constrói impérios.</p>
+                        </div>
+                    </div>
+                    ${state.exercises.length === 0 ? `
+                        <div class="text-center py-20 opacity-70 flex flex-col items-center">
+                            <div class="w-24 h-24 border-2 border-slate-800 flex items-center justify-center mb-6 relative"><div class="absolute inset-0 bg-fuchsia-500/5 animate-pulse"></div><i data-lucide="dumbbell" class="w-10 h-10 text-slate-600"></i></div>
+                            <h3 class="text-2xl font-greek font-bold text-white mb-2">O SILÊNCIO DO TEMPLO</h3>
+                            <p class="text-slate-500 font-phonk tracking-wider mb-8">Inicie sua jornada.</p>
+                            <button onclick="renderView('new')" class="px-6 py-3 bg-fuchsia-600 text-white font-phonk font-bold uppercase tracking-widest clip-path-slant hover:bg-fuchsia-500">Criar Legado</button>
+                        </div>
+                    ` : `
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                            ${state.exercises.map(ex => {
+                                const last = ex.history[ex.history.length-1];
+                                return `
+                                <div onclick="(() => { const ex = state.exercises.find(e => e.id === '${ex.id}'); renderView('detail', ex) })()" class="bg-slate-900/40 backdrop-blur-md border border-slate-800 p-5 hover:border-fuchsia-500/50 transition-all cursor-pointer group relative overflow-hidden clip-path-slant">
+                                    <div class="absolute inset-0 bg-noise opacity-[0.03]"></div>
+                                    <div class="flex justify-between items-start mb-6">
+                                        <h3 class="font-greek font-bold text-xl text-white group-hover:text-fuchsia-400 group-hover:text-glow transition-colors truncate pr-2 uppercase max-w-[70%]">${ex.name}</h3>
+                                        <span class="bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-bold px-3 py-1 uppercase tracking-widest font-phonk clip-path-badge">${ex.muscle}</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="bg-black/40 p-3 border-l-2 border-slate-700">
+                                            <p class="text-[10px] uppercase text-slate-500 font-phonk tracking-widest mb-1 flex items-center gap-1"><i data-lucide="history" class="w-3 h-3"></i> Última</p>
+                                            <div class="flex items-baseline gap-1"><span class="text-3xl font-phonk font-bold text-white">${last ? last.weight : '-'}</span><span class="text-xs text-slate-500 font-mono">KG</span></div>
+                                        </div>
+                                        <div class="bg-black/40 p-3 border-l-2 border-amber-600/50 relative overflow-hidden">
+                                            <div class="absolute top-0 right-0 p-1 opacity-20"><i data-lucide="crown" class="w-6 h-6"></i></div>
+                                            <p class="text-[10px] uppercase text-amber-500/70 font-phonk tracking-widest mb-1 flex items-center gap-1"><i data-lucide="flame" class="w-3 h-3"></i> LENDA</p>
+                                            <div class="flex items-baseline gap-1"><span class="text-3xl font-phonk font-bold text-amber-400 text-glow-gold">${ex.maxWeight || 0}</span><span class="text-xs text-amber-500/50 font-mono">KG</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `}
+                </div>
+            `;
+        }
+
+        function renderDetail(container) {
+            const ex = state.selectedExercise;
+            const history = [...(ex.history || [])].reverse();
+            const todaySets = ex.history.filter(h => new Date(h.date).toDateString() === new Date().toDateString()).length;
+            const lastSet = ex.history[ex.history.length - 1];
+            const defaultWeight = lastSet ? lastSet.weight : '';
+            const defaultReps = lastSet ? lastSet.reps : '';
+
+            container.innerHTML = `
+                <div class="animate-fade-in pt-2 lg:pt-0 pb-20 lg:pb-0">
+                    <header class="flex flex-col gap-4 border-b border-slate-800 pb-6 mb-8 sticky top-0 lg:static bg-[#050505]/95 z-20 pt-4 lg:pt-0">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center gap-4 w-full">
+                                <button onclick="renderView('list')" class="text-slate-500 hover:text-white"><i data-lucide="chevron-left" class="w-7 h-7"></i></button>
+                                <div class="flex-1">
+                                    ${state.isEditing ? `
+                                        <div class="space-y-4 animate-fade-in">
+                                            <input id="edit-name" value="${ex.name}" class="w-full bg-slate-900/80 border border-slate-700 px-4 py-3 text-white focus:outline-none focus:border-fuchsia-500 clip-path-slant" placeholder="Nome">
+                                            <div class="flex flex-wrap gap-2">
+                                                ${MUSCLES.map(m => `<button onclick="setEditMuscle('${m}')" class="px-3 py-1 text-[10px] font-phonk uppercase border transition-all ${window.editMuscleVal === m ? 'bg-fuchsia-600 text-white border-fuchsia-400' : 'bg-slate-900 border-slate-700 text-slate-500'}">${m}</button>`).join('')}
+                                            </div>
+                                        </div>
+                                    ` : `
+                                        <div><h2 class="text-3xl lg:text-5xl font-greek font-black text-white uppercase leading-none tracking-tight text-glow-white mb-2">${ex.name}</h2>
+                                        <span class="bg-fuchsia-900/20 text-fuchsia-400 border border-fuchsia-500/30 shadow-[0_0_10px_rgba(217,70,239,0.1)] text-[10px] font-bold px-3 py-1 uppercase tracking-widest font-phonk clip-path-badge">${ex.muscle}</span></div>
+                                    `}
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-2 ml-4">
+                                ${state.isEditing ? `
+                                    <button onclick="updateExercise()" class="p-3 bg-fuchsia-600/20 text-fuchsia-400 border border-fuchsia-500/50 hover:bg-fuchsia-600 hover:text-white rounded transition-all"><i data-lucide="save"></i></button>
+                                    <button onclick="toggleEdit()" class="p-3 bg-slate-800 text-slate-400 border border-slate-700 hover:text-white rounded transition-all"><i data-lucide="x"></i></button>
+                                ` : `
+                                    <button onclick="toggleEdit()" class="p-3 text-slate-500 hover:text-white hover:bg-white/5 rounded border border-transparent hover:border-slate-700 transition-all"><i data-lucide="pencil"></i></button>
+                                    <button onclick="deleteExercise()" class="p-3 text-red-500 hover:text-red-400 hover:bg-red-900/10 rounded border border-transparent hover:border-red-900/30 transition-all"><i data-lucide="trash-2"></i></button>
+                                `}
+                            </div>
+                        </div>
+                    </header>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+                        <div class="lg:col-span-5 space-y-8">
+                            <div class="bg-slate-900/30 border border-slate-800 p-6 relative overflow-hidden group hover:border-fuchsia-500/30 transition-colors clip-path-slant">
+                                <div class="absolute inset-0 bg-noise opacity-[0.05]"></div>
+                                <form onsubmit="addSet(event)" class="relative z-10 space-y-6">
+                                    <div class="flex items-center gap-2 text-fuchsia-400 mb-2"><i data-lucide="zap" class="animate-pulse"></i><h3 class="text-sm font-greek font-bold uppercase tracking-[0.3em]">Nova Oferenda</h3></div>
+                                    <div class="grid grid-cols-2 gap-6">
+                                        <div class="space-y-2"><label class="text-[10px] text-slate-500 font-phonk tracking-widest uppercase ml-1">Peso (KG)</label><input id="set-weight" type="number" step="0.5" class="w-full bg-black border border-slate-800 p-4 text-4xl font-phonk font-bold text-white text-center focus:border-fuchsia-500 focus:outline-none placeholder:text-slate-800 clip-path-slant" placeholder="0" value="${defaultWeight}" autofocus></div>
+                                        <div class="space-y-2"><label class="text-[10px] text-slate-500 font-phonk tracking-widest uppercase ml-1">Reps</label><input id="set-reps" type="number" class="w-full bg-black border border-slate-800 p-4 text-4xl font-phonk font-bold text-white text-center focus:border-fuchsia-500 focus:outline-none placeholder:text-slate-800 clip-path-slant" placeholder="0" value="${defaultReps}"></div>
+                                    </div>
+                                    <button type="submit" class="w-full py-5 text-xl tracking-[0.2em] bg-fuchsia-600 text-white font-phonk font-bold uppercase hover:bg-fuchsia-500 shadow-[0_0_20px_rgba(192,38,211,0.4)] clip-path-slant flex justify-center items-center gap-2"><i data-lucide="plus"></i> REGISTRAR</button>
+                                </form>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-gradient-to-br from-amber-900/10 to-black border border-amber-900/30 p-6 flex flex-col items-center justify-center text-center relative overflow-hidden clip-path-slant">
+                                    <div class="absolute top-0 right-0 p-2 text-amber-500/10"><i data-lucide="crown" class="w-8 h-8"></i></div>
+                                    <span class="text-[10px] text-amber-500 font-phonk uppercase tracking-[0.3em] mb-1">Lenda (Max)</span>
+                                    <span class="text-4xl font-phonk font-bold text-white mt-1 text-glow-gold">${ex.maxWeight || 0}</span>
+                                    <span class="text-[10px] text-amber-500/50 font-mono mt-1">KG</span>
+                                </div>
+                                <div class="bg-slate-900/30 border border-slate-800 p-6 flex flex-col items-center justify-center text-center clip-path-slant">
+                                    <span class="text-[10px] text-slate-500 font-phonk uppercase tracking-[0.3em] mb-1">Séries Hoje</span>
+                                    <span class="text-4xl font-phonk font-bold text-white mt-1">${todaySets}</span>
+                                    <span class="text-[10px] text-slate-600 font-mono mt-1">SETS</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-7">
+                            <div class="border-l border-slate-800 pl-0 lg:pl-12 h-full">
+                                <h3 class="text-sm font-greek font-bold text-slate-400 uppercase mb-8 flex items-center gap-3 tracking-[0.2em]"><i data-lucide="history" class="w-4 h-4"></i> Crônicas do Passado</h3>
+                                <div class="space-y-4 relative">
+                                    ${history.length === 0 ? '<div class="py-20 text-center opacity-30"><p class="font-greek uppercase tracking-widest">O pergaminho está em branco.</p></div>' : 
+                                    history.map(set => {
+                                        const isPR = set.weight >= (ex.maxWeight || 0) && set.weight > 0;
+                                        const date = new Date(set.date);
+                                        const isToday = date.toDateString() === new Date().toDateString();
+                                        return `
+                                        <div class="relative p-4 flex justify-between items-center transition-all ${isToday ? 'bg-fuchsia-900/10 border border-fuchsia-500/30' : 'bg-transparent border-b border-slate-800'}">
+                                            <div class="flex items-center gap-6">
+                                                <div class="w-12 h-12 flex items-center justify-center font-phonk font-bold text-2xl border ${isPR ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'bg-black text-slate-400 border-slate-800'}">${set.reps}</div>
+                                                <div class="flex flex-col">
+                                                    <div class="flex items-baseline gap-2"><span class="text-3xl font-phonk font-bold ${isPR ? 'text-amber-400 text-glow-gold' : 'text-white'}">${set.weight}</span><span class="text-[10px] text-slate-600 font-mono uppercase">KG</span></div>
+                                                    <span class="text-[10px] text-slate-500 font-bold uppercase flex items-center gap-2 mt-1 tracking-wider">${date.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'})} <span class="opacity-30">|</span> ${date.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}</span>
+                                                </div>
+                                            </div>
+                                            ${isPR ? '<div class="flex flex-col items-end animate-pulse"><span class="bg-amber-900/20 text-amber-400 border border-amber-500/30 shadow-[0_0_10px_rgba(251,191,36,0.1)] text-[10px] font-bold px-3 py-1 uppercase tracking-widest font-phonk clip-path-badge">LENDA</span></div>' : ''}
+                                        </div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPlans(container) {
+            container.innerHTML = `
+                <div class="animate-fade-in space-y-8 pb-20">
+                    <div class="border-b border-slate-800 pb-6">
+                        <h2 class="text-4xl lg:text-5xl font-greek font-bold text-white uppercase mb-1">Pergaminhos</h2>
+                        <p class="text-amber-500 font-phonk tracking-widest text-sm lg:text-base uppercase">Sabedoria dos Antigos</p>
+                    </div>
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                        ${TRAINING_PLANS.map(plan => `
+                            <div class="relative group">
+                                <div class="absolute inset-0 bg-gradient-to-r from-fuchsia-500/20 to-amber-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                                <div class="h-full border border-slate-800 bg-black/80 flex flex-col relative z-10 p-5 clip-path-slant">
+                                    <div class="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h3 class="text-3xl font-greek font-bold text-white uppercase text-glow-white mb-1">${plan.title}</h3>
+                                            <span class="text-sm font-phonk tracking-widest text-fuchsia-400 uppercase border border-fuchsia-900/50 px-2 py-0.5 bg-fuchsia-900/10">${plan.target}</span>
+                                        </div>
+                                        <i data-lucide="swords" class="w-8 h-8 text-slate-700 group-hover:text-amber-500 transition-colors"></i>
+                                    </div>
+                                    <p class="text-slate-400 mb-6 font-sans text-sm leading-relaxed border-l-2 border-slate-700 pl-4 italic">"${plan.description}"</p>
+                                    <div class="bg-slate-900/50 p-4 rounded mb-6 border border-slate-800">
+                                        <h4 class="text-amber-500 font-phonk uppercase tracking-widest mb-3 flex items-center gap-2 text-sm"><i data-lucide="info" class="w-3 h-3"></i> Oráculo</h4>
+                                        <ul class="space-y-2">${plan.tips.map(t => `<li class="text-xs text-slate-300 flex items-start gap-2"><span class="text-fuchsia-500 mt-0.5">►</span> ${t}</li>`).join('')}</ul>
+                                    </div>
+                                    <div class="mb-8 flex-1">
+                                        <h4 class="text-slate-500 font-phonk uppercase tracking-widest mb-3 text-sm">Arsenal (${plan.exercises.length})</h4>
+                                        <div class="flex flex-wrap gap-2">${plan.exercises.map(e => `<span class="text-[10px] uppercase font-bold bg-slate-800 border border-slate-700 px-2 py-1 text-slate-400">${e.name}</span>`).join('')}</div>
+                                    </div>
+                                    <button onclick="importPlan('${plan.id}')" ${state.importing ? 'disabled' : ''} class="w-full mt-auto px-6 py-3 bg-amber-600 text-black font-phonk font-bold uppercase tracking-widest hover:bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.4)] clip-path-slant flex justify-center items-center gap-2">
+                                        ${state.importing ? '<i data-lucide="activity" class="animate-spin"></i>' : 'FORJAR ESTE DESTINO'}
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTips(container) {
+            container.innerHTML = `
+                <div class="animate-fade-in space-y-8">
+                    <div class="border-b border-slate-800 pb-6">
+                        <h2 class="text-4xl lg:text-5xl font-greek font-bold text-white uppercase mb-1">O Oráculo</h2>
+                        <p class="text-cyan-500 font-phonk tracking-widest text-sm lg:text-base uppercase">Conhecimento é poder.</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        ${TIPS_DATA.map(s => `
+                            <div class="bg-black/80 border border-slate-800 p-5 clip-path-slant">
+                                <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
+                                    <div class="p-3 bg-cyan-900/20 rounded-full text-cyan-400 border border-cyan-500/30"><i data-lucide="${s.icon}"></i></div>
+                                    <h3 class="text-2xl font-greek font-bold text-white uppercase">${s.category}</h3>
+                                </div>
+                                <div class="space-y-6">
+                                    ${s.items.map(i => `
+                                        <div class="group">
+                                            <h4 class="text-amber-500 font-phonk uppercase text-lg tracking-wide mb-1 flex items-center gap-2">
+                                                <span class="w-1.5 h-1.5 bg-fuchsia-500 rotate-45 group-hover:bg-amber-400 transition-colors"></span> ${i.title}
+                                            </h4>
+                                            <p class="text-slate-400 text-sm leading-relaxed pl-4 border-l border-slate-800 group-hover:border-fuchsia-500/50 transition-colors">${i.content}</p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderWeight(container) {
+            const latest = state.weightHistory[0] || {};
+            const imcData = calculateIMC(latest.weight, latest.height);
+            container.innerHTML = `
+                <div class="animate-fade-in space-y-8">
+                    <div class="border-b border-slate-800 pb-6">
+                        <h2 class="text-4xl lg:text-5xl font-greek font-bold text-white uppercase mb-1">Templo do Corpo</h2>
+                        <p class="text-emerald-500 font-phonk tracking-widest text-sm lg:text-base uppercase">Evolução física.</p>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        <div class="lg:col-span-5 space-y-6">
+                            <div class="bg-slate-900/30 border border-emerald-900/30 relative overflow-hidden p-5 clip-path-slant">
+                                <div class="absolute top-0 right-0 p-4 opacity-10 text-emerald-500"><i data-lucide="scale" class="w-24 h-24"></i></div>
+                                <form onsubmit="saveWeight(event)" class="relative z-10 space-y-6">
+                                    <div class="flex items-center gap-2 text-emerald-400 mb-2"><i data-lucide="target" class="w-5 h-5"></i><h3 class="text-sm font-greek font-bold uppercase tracking-[0.3em]">Registro</h3></div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="flex flex-col gap-1"><label class="text-xs font-bold text-amber-500/80 uppercase tracking-widest font-greek">Peso (KG)</label><input id="weight-input" type="number" step="0.1" class="w-full bg-slate-900/80 border border-slate-700 px-4 py-3 text-white focus:outline-none focus:border-emerald-500 clip-path-slant" placeholder="00.0"></div>
+                                        <div class="flex flex-col gap-1"><label class="text-xs font-bold text-amber-500/80 uppercase tracking-widest font-greek">Altura (CM)</label><input id="height-input" type="number" value="${latest.height || ''}" class="w-full bg-slate-900/80 border border-slate-700 px-4 py-3 text-white focus:outline-none focus:border-emerald-500 clip-path-slant" placeholder="000"></div>
+                                    </div>
+                                    <button type="submit" class="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-phonk font-bold uppercase tracking-widest shadow-[0_0_20px_rgba(16,185,129,0.3)] clip-path-slant">SALVAR</button>
+                                </form>
+                            </div>
+                            ${state.weightHistory.length > 0 ? `
+                                <div class="bg-black/60 text-center flex flex-col items-center justify-center p-8 border border-slate-800 clip-path-slant">
+                                    <i data-lucide="brain" class="text-slate-600 mb-4 w-8 h-8"></i>
+                                    <div class="text-[10px] text-slate-500 font-phonk uppercase tracking-[0.3em] mb-2">IMC Estimado</div>
+                                    <div class="text-6xl font-phonk font-bold text-white mb-2">${imcData.val}</div>
+                                    <span class="${imcData.color} border text-[10px] font-bold px-3 py-1 uppercase tracking-widest font-phonk clip-path-badge">${imcData.status}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="lg:col-span-7">
+                            <h3 class="text-sm font-greek font-bold text-slate-400 uppercase mb-6 flex items-center gap-3 tracking-[0.2em]"><i data-lucide="history" class="w-4 h-4"></i> Histórico</h3>
+                            <div class="space-y-3">
+                                ${state.weightHistory.length === 0 ? '<div class="text-center py-10 opacity-30 text-slate-500 font-greek">Nenhuma medida registrada.</div>' : 
+                                state.weightHistory.map((w, idx) => {
+                                    const diff = idx < state.weightHistory.length-1 ? (w.weight - state.weightHistory[idx+1].weight).toFixed(1) : 0;
+                                    const diffColor = diff > 0 ? 'text-red-400' : 'text-emerald-400';
+                                    const sign = diff > 0 ? '+' : '';
+                                    return `
+                                    <div class="flex justify-between items-center p-4 bg-slate-900/20 border border-slate-800 hover:border-emerald-500/30 transition-all rounded">
+                                        <div class="flex items-center gap-4">
+                                            <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-emerald-500"><i data-lucide="scale" class="w-4 h-4"></i></div>
+                                            <div>
+                                                <div class="text-2xl font-phonk font-bold text-white">${w.weight} <span class="text-xs text-slate-600">KG</span></div>
+                                                <div class="text-[10px] text-slate-500 uppercase tracking-widest">${new Date(w.date).toLocaleDateString('pt-BR')}</div>
+                                            </div>
+                                        </div>
+                                        ${idx < state.weightHistory.length -1 ? `<div class="text-sm font-bold ${diffColor}">${sign}${diff}</div>` : ''}
+                                    </div>`;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderNew(container) {
+            container.innerHTML = `
+                <div class="max-w-2xl mx-auto animate-fade-in pt-4 lg:pt-0">
+                    <header class="flex items-center gap-4 mb-10 border-b border-slate-800 pb-4">
+                        <button onclick="renderView('list')" class="p-2 hover:bg-white/5 lg:hidden text-fuchsia-500"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+                        <h2 class="text-3xl lg:text-4xl font-greek font-bold text-white uppercase">Novo Desafio</h2>
+                    </header>
+                    <form onsubmit="createExercise(event)" class="space-y-10">
+                        <div class="flex flex-col gap-1 w-full">
+                            <label class="text-xs font-bold text-amber-500/80 uppercase tracking-[0.2em] ml-1 font-greek mb-1">Nome do Exercício</label>
+                            <input id="new-ex-name" class="w-full bg-slate-900/80 border border-slate-700 px-4 py-3 text-white focus:outline-none focus:border-fuchsia-500 focus:shadow-[0_0_15px_rgba(217,70,239,0.3)] placeholder:text-slate-700 font-mono clip-path-slant" placeholder="EX: SUPINO DE ZEUS" autofocus>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-amber-500/80 uppercase tracking-[0.2em] ml-1 font-greek mb-3 block">Grupo Muscular</label>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                ${MUSCLES.map(m => `
+                                    <button type="button" onclick="setNewMuscle('${m}')" class="p-4 text-lg font-phonk tracking-wide border transition-all duration-200 uppercase clip-path-badge ${window.newExerciseMuscle === m ? 'bg-fuchsia-600 text-white border-fuchsia-400 shadow-[0_0_15px_rgba(192,38,211,0.5)]' : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600 hover:text-white'}">${m}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="pt-8">
+                            <button type="submit" class="w-full px-6 py-6 text-xl bg-fuchsia-600 text-white font-phonk font-bold uppercase tracking-widest hover:bg-fuchsia-500 shadow-[0_0_20px_rgba(192,38,211,0.4)] clip-path-slant">INICIAR LEGADO</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+        }
+
+        // Calendar HTML Helper
+        function getCalendarHTML() {
+            const daysInMonth = new Date(state.currentYear, state.currentMonth + 1, 0).getDate();
+            const firstDay = new Date(state.currentYear, state.currentMonth, 1).getDay();
+            const monthName = new Date(state.currentYear, state.currentMonth).toLocaleString('pt-BR', { month: 'long' });
+            
+            const activeDates = new Set();
+            state.exercises.forEach(ex => {
+                if(ex.history) ex.history.forEach(h => activeDates.add(new Date(h.date).toDateString()));
+            });
+
+            let daysHTML = '';
+            for(let i=0; i<firstDay; i++) daysHTML += `<div class="h-8 w-8"></div>`;
+            
+            const today = new Date();
+            for(let d=1; d<=daysInMonth; d++) {
+                const date = new Date(state.currentYear, state.currentMonth, d);
+                const isActive = activeDates.has(date.toDateString());
+                const isToday = d === today.getDate() && state.currentMonth === today.getMonth() && state.currentYear === today.getFullYear();
+                
+                daysHTML += `
+                <div class="h-8 w-8 flex items-center justify-center text-xs font-phonk relative ${isActive ? 'text-black font-bold bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.6)] z-10' : 'text-slate-600'} ${isToday && !isActive ? 'border border-fuchsia-500 text-fuchsia-500' : ''}" style="${isActive ? 'clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%)' : ''}">
+                    ${d}
+                </div>`;
+            }
+
+            return `
+                <div class="bg-black/60 p-4 border border-slate-800 clip-path-slant">
+                    <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+                        <h4 class="text-amber-500 font-greek uppercase text-sm tracking-widest flex items-center gap-2"><i data-lucide="calendar" class="w-3 h-3"></i> Oráculo</h4>
+                        <div class="flex items-center gap-2">
+                            <button onclick="changeMonth(-1)" class="text-slate-500 hover:text-white"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                            <span class="text-xs font-phonk uppercase text-slate-300 w-24 text-center">${monthName} ${state.currentYear}</span>
+                            <button onclick="changeMonth(1)" class="text-slate-500 hover:text-white"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center mb-2">${['D','S','T','Q','Q','S','S'].map(d=>`<span class="text-[10px] text-slate-600 font-bold">${d}</span>`).join('')}</div>
+                    <div class="grid grid-cols-7 gap-1 place-items-center">${daysHTML}</div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
